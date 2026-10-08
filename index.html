@@ -230,10 +230,15 @@ td:last-child{text-align:right;font-family:var(--num);font-weight:600}
 
   <div class="actions">
     <button class="btn btn-esc" id="goEscape">🔐 Escape Room: Hot Lab<small>5 สถานี 1 ประตู ใช้เวลา 5–10 นาที เลือกความยากได้</small></button>
-    <button class="btn btn-main" id="goRush">⚡ เริ่ม Rush<small>10 เคส จับเวลา 35 วินาทีต่อเคส</small></button>
+    <button class="btn btn-main" id="goRush">⚡ เริ่ม Rush<small id="rushSub">10 เคส จับเวลา 1 นาทีต่อเคส</small></button>
     <button class="btn btn-alt" id="goPractice">🧪 ฝึกแบบไม่จับเวลา<small>10 เคส คิดได้เต็มที่</small></button>
   </div>
   <p class="best" id="bestLine"></p>
+
+  <div class="pick">
+    <p>⏱ เวลาต่อเคสในโหมด Rush</p>
+    <div class="seg" id="timeSeg"></div>
+  </div>
 
   <div class="pick">
     <p>แบบโจทย์สำหรับ Rush และโหมดฝึก</p>
@@ -247,7 +252,7 @@ td:last-child{text-align:right;font-family:var(--num);font-weight:600}
   <details class="howto">
     <summary>วิธีเล่น</summary>
     <p><b>Escape Room</b>: 5 สถานีใช้วิธีตอบต่างกัน ทั้งพิมพ์ค่าลงเครื่องวัด เลือกคำตอบ และหมุนตั้งเวลา ตอบถูกได้รหัส 1 หลัก ตอบผิดลองใหม่ได้แต่เสียเวลา ขอคำใบ้ได้จำกัด เวลาที่เหลือคือโดส F-18 ของคนไข้ที่สลายลงเรื่อย ๆ ถ้าต่ำกว่า 185 MBq ก่อนออกจากห้องถือว่าแพ้ จบแล้วได้ดาว 1–3 ดวงตามความแม่น</p>
-    <p><b>Rush / ฝึก</b>: โจทย์ 5 แบบ คือ activity ที่เหลือ, ปริมาตรที่ต้องดูด, activity ที่ต้องเตรียมเผื่อ, เวลาที่ต้องรอ และระบุนิวไคลด์จากการวัด 2 ครั้ง</p>
+    <p><b>Rush / ฝึก</b>: Rush เลือกเวลาต่อเคสได้ 1, 2, 3, 4 หรือ 5 นาที ยิ่งตอบเร็วยิ่งได้โบนัส สถิติแยกตามเวลาที่เลือก โจทย์ 5 แบบ คือ activity ที่เหลือ, ปริมาตรที่ต้องดูด, activity ที่ต้องเตรียมเผื่อ, เวลาที่ต้องรอ และระบุนิวไคลด์จากการวัด 2 ครั้ง</p>
     <p>สูตรหลัก A = A₀ × 0.5<sup>t/T½</sup> และ T½ = t × 0.693 ÷ ln(A₀/A) ตัวเลือกผิดหลายข้อมาจากความผิดพลาดที่เจอบ่อย</p>
   </details>
 </section>
@@ -264,7 +269,9 @@ td:last-child{text-align:right;font-family:var(--num);font-weight:600}
 </main>
 <script>
 (function(){
-const RUSH_SEC=35, N_CASES=10;
+const N_CASES=10;
+const TIMES=[60,120,180,240,300];
+const tLabel=t=>`${t/60} นาที`;
 const $=s=>document.querySelector(s);
 const rand=(a,b)=>a+Math.random()*(b-a);
 const randInt=(a,b)=>Math.floor(rand(a,b+1));
@@ -306,9 +313,9 @@ function load(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:v; }
 function save(k,v){ try{ localStorage.setItem(k,String(v)); }catch(e){} }
 const getBest=m=>Number(load('hlr-best-'+m,0))||0;
 function showBest(){
-  const r=getBest('rush'),p=getBest('practice'),parts=[];
+  const r=Number(load('hlr-best-rush-'+rushSec,0))||0,p=getBest('practice'),parts=[];
   ['easy','normal','hard'].forEach(d=>{ const v=Number(load('hlr-best-escape-'+d,0))||0; if(v) parts.push(`🔐 ${DIFF[d].name} เหลือ ${mmss(v)}`); });
-  if(r) parts.push(`🏆 Rush ${r}`); if(p) parts.push(`ฝึก ${p}`);
+  if(r) parts.push(`🏆 Rush ${tLabel(rushSec)} ${r}`); if(p) parts.push(`ฝึก ${p}`);
   $('#bestLine').textContent=parts.join('  ·  '); $('#bestLine').hidden=!parts.length;
 }
 
@@ -326,6 +333,13 @@ function renderSeg(){
   document.querySelectorAll('#typeSeg button').forEach(b=>b.onclick=()=>{typeChoice=b.dataset.t;save('hlr-type',typeChoice);renderSeg();});
 }
 renderSeg();
+let rushSec=Number(load('hlr-rushsec',60)); if(!TIMES.includes(rushSec)) rushSec=60;
+function renderTime(){
+  $('#timeSeg').innerHTML=TIMES.map(t=>`<button data-s="${t}" aria-pressed="${t===rushSec}">${tLabel(t)}</button>`).join('');
+  $('#rushSub').textContent=`10 เคส จับเวลา ${tLabel(rushSec)}ต่อเคส`;
+  document.querySelectorAll('#timeSeg button').forEach(b=>b.onclick=()=>{rushSec=+b.dataset.s;save('hlr-rushsec',rushSec);renderTime();showBest();});
+}
+renderTime();
 
 /* sound */
 let AC=null,noise=null,soundOn=load('hlr-sound','1')==='1';
@@ -493,7 +507,7 @@ function startGame(mode){
   let types;
   if(typeChoice==='mix') types=shuffle(['remaining','remaining','volume','volume','precal','precal','wait','wait','identify','identify']);
   else types=Array(N_CASES).fill(typeChoice);
-  S={mode,i:0,score:0,streak:0,best:0,cases:types.map(t=>genCase(t)),results:[],locked:false,timer:null};
+  S={mode,sec:rushSec,i:0,score:0,streak:0,best:0,cases:types.map(t=>genCase(t)),results:[],locked:false,timer:null};
   show('game'); $('#timerWrap').hidden=mode!=='rush'; renderCase();
 }
 function hud(popCombo){
@@ -506,14 +520,14 @@ function renderCase(){
   $('#caseArea').innerHTML=caseHTML(c);
   document.querySelectorAll('#caseArea .opt').forEach(b=>b.onclick=()=>answer(+b.dataset.k));
   window.scrollTo({top:0});
-  if(S.mode==='rush'){ S.deadline=performance.now()+RUSH_SEC*1000; tick(); S.timer=setInterval(tick,100); }
+  if(S.mode==='rush'){ S.deadline=performance.now()+S.sec*1000; tick(); S.timer=setInterval(tick,100); }
 }
 function tick(){
   const left=Math.max(0,(S.deadline-performance.now())/1000);
-  $('#timerFill').style.width=(left/RUSH_SEC*100)+'%';
-  $('#timer').classList.toggle('mid',left<16&&left>=8); $('#timer').classList.toggle('low',left<8);
-  $('#tleft').textContent=`เหลือ ${Math.ceil(left)} วินาที`; S.left=left;
-  const rate=left<5?.9:left<10?.5:left<20?.2:.06; if(Math.random()<rate) geiger(); if(left<10&&Math.random()<rate) setTimeout(geiger,rand(20,80));
+  $('#timerFill').style.width=(left/S.sec*100)+'%';
+  const fr=left/S.sec; $('#timer').classList.toggle('mid',fr<.45&&fr>=.22); $('#timer').classList.toggle('low',fr<.22);
+  $('#tleft').textContent=`เหลือ ${mmss(left)}`; S.left=left;
+  const rate=fr<.14?.9:fr<.28?.5:fr<.57?.2:.06; if(Math.random()<rate) geiger(); if(fr<.28&&Math.random()<rate) setTimeout(geiger,rand(20,80));
   if(left<=0) answer(-1);
 }
 const CHEERS=['เป๊ะมาก!','ถูกต้อง!','แม่นเหมือน calibrator!','สุดยอด!','ไวและแม่น!'];
@@ -522,7 +536,7 @@ function answer(k){
   const c=S.cases[S.i],ok=k>=0&&c.options[k].ok,btns=document.querySelectorAll('#caseArea .opt');
   btns.forEach((b,j)=>{ b.disabled=true; if(c.options[j].ok) b.classList.add('right'); else if(j===k) b.classList.add('wrong'); else b.classList.add('dim'); });
   let pts=0;
-  if(ok){ S.streak++; S.best=Math.max(S.best,S.streak); pts=100+(S.mode==='rush'?Math.round((S.left||0)*4):0)+Math.min(S.streak-1,4)*20; S.score+=pts; sndRight(); confetti(btns[k],S.streak>=3?34:20); }
+  if(ok){ S.streak++; S.best=Math.max(S.best,S.streak); pts=100+(S.mode==='rush'?Math.round((S.left||0)/S.sec*140):0)+Math.min(S.streak-1,4)*20; S.score+=pts; sndRight(); confetti(btns[k],S.streak>=3?34:20); }
   else { S.streak=0; sndWrong(); if(!reduce) $('#opts').classList.add('shake'); }
   if(c.type==='wait'){ $('#gapTxt').textContent=fmtDur(c.answer); $('#endTxt').textContent=fmtClock(c.t1,c.showDay); }
   S.results.push({c,ok,timeout:k<0}); hud(ok&&S.streak>1);
@@ -540,8 +554,9 @@ function rank(n){
   return ['🧪','เด็กฝึกงาน hot lab','ลองโหมดฝึกแล้วอ่านวิธีคิดทีละข้อ เดี๋ยวก็คล่อง'];
 }
 function endGame(){
-  const correct=S.results.filter(r=>r.ok).length,prev=getBest(S.mode),isNew=S.score>prev;
-  if(isNew) save('hlr-best-'+S.mode,S.score);
+  const bk=S.mode==='rush'?'hlr-best-rush-'+S.sec:'hlr-best-'+S.mode;
+  const correct=S.results.filter(r=>r.ok).length,prev=Number(load(bk,0))||0,isNew=S.score>prev;
+  if(isNew) save(bk,S.score);
   const [emo,name,sub]=rank(correct);
   show('end');
   $('#end').innerHTML=`<div class="rank" id="rankEmo">${emo}</div><p class="rank-name">${name}</p><p class="lede" style="margin:2px 0 0">${sub}</p>
